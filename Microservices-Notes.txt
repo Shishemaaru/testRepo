@@ -1,0 +1,135 @@
+*** MICROSERVICES ***
+
+1. @RestControllerAdvice and @ExceptionHandler can be used to create Custom Exception classes.
+2. @Transient can be used for a field/object of an Entity to not save that field/object inside the DB of a microservice.
+
+
+HOW TO CREATE A MICROSERVICE ACTING AS A SERVICE REGISTRY:
+
+1. Need Eureka server dependency
+2. @EnableEurekaServer annotation in the @SpringBootApplication class
+3. eureka.instance.hostname: localhost (instance of eureka shall be deployed on localhost)
+4. a) eureka.client.register-with-eureka: false (prevents the eureka server from registering itself as a microservice. Should behave as a server to deploy other microservices)
+   b) fetch.registry: false
+
+
+TO REGISTER A MICROSERVICE AS A CLIENT:
+
+1. Need Cloud Bootstrap & Eureka discovery client dependencies
+2. @EnableEurekaClient annotation in the @SpringBootApplication class
+3. erueka.instance.prefer-ip-address: true (used to prefer ip address to guess)
+4. a) fetch-registry: true
+   b) eureka.client.register-with-eureka: true
+   c) service-url.default-zone: http://localhost:8761 (service registry URL to be used)
+5. spring.aplication.name: MICROSERVICE-NAME
+6. @LoadBalanced annotation shall be used to create a bean of RestTemplate, if using RestTemplate for inter-service communication.
+7. @FeignClient can be used instead of RestTemplate to fetch data frmo another service via Interface implementation
+
+
+TO CREATE A GATEWAY MICROSERVICE:
+
+1. Cloud Boostrap & Gateway & Spring Reactive web & eureky discovery client dependencies
+2. a) spring:
+		cloud:
+			gateway:
+				routes:
+					- id: USER-SERVICE
+					  uri: lb://USER-SERVICE (Where lb is Load Balancer)
+					  predicates:
+					  	- Path=/users/**
+						
+					- id: HOTEL-SERVICE
+					  uri: lb://HOTEL-SERVICE (Where lb is Load Balancer)
+					  predicates:
+					  	- Path=/hotels/**,/staffs/**
+						
+					- id: RATING-SERVICE
+					  uri: lb://RATING-SERVICE (Where lb is Load Balancer)
+					  predicates:
+					  	- Path=/ratings/**
+						
+
+TO CREATE A CONFIGURATION SERVER:
+
+1. Add Config Server & Eureka Discovery Client dependency
+2. @EnableConfigServer annotation in the @SpringBootApplication class
+3. @EnableEurekaClient annotation in the @SpringBootApplication class
+4. spring:
+	cloud:
+		config:
+			server:
+				git:
+					uri: URL_OF_GITHUB_REPOSITORY
+					clone-on-start: true
+5. Use Config client dependency to import configs from github file to a microservice property file
+6. use spring.config.import: configserver:http://localhost:8085 to import the properties from github
+
+
+
+
+API CAN BE MADE FAULT TOLERANT IN 2 WAYS:
+
+
+I - USING CIRCUIT BREAKER
+
+1. There are 3 important states of a circuit or connection between services i.e. CLOSED, OPEN & HALF-OPEN.
+2. @CircuitBreaker(name="dummyCircuitBreakerName", fallbackMethod="dummyFallbackMethodName") can be used over an endpoint.
+3. The return type of the fallback method must be same as the endpoint that might be failing.
+4. Use actuators to monitor health by exposing health endpoints and enabling circuit breakers with ==>
+	
+								management:
+									endpoints:
+										web:
+											exposure:
+												include: health (only health needed, if all endpoints are required then * can be used)
+									health:
+										circuitbreakers:
+											enabled: true
+									endpoint:
+										health:
+											show-details: always
+											
+5. Configure the propeties of the resilience4j circuitbreaker with ==>
+									
+									resilience4j:
+										circuitbreaker:
+											instances:
+												dummyCircuitBreakerName:
+													registerHealthIndicator: true
+													eventConsumerBufferSize: 10 (Total number of calls before this buffer size is refreshed, includes both success and failed calls)
+													failureRateThreshold: 50
+													minimumNumberOfCalls: 5
+													automaticTransitionFromOpenToHalfOpenEnabled: true
+													waitDurationInOpenState: 6s
+													permittedNumberOfCallsInHalfOpenState: 3
+													slidingWindowSize: 10
+													slidingWindowType: COUNT_BASED (could also be TIME_BASED)
+
+
+II - USING RETRY MODULE
+
+1. @Retry(name="dummyRetryName", fallbackMethod="dummyFallbackMethodName") can be used over an endpoint.
+2. Retry properties can be configured using ==>
+					
+					management:
+						retry:
+							instances:
+								dummyRetryName:
+									max-attempts: 3
+									wait-duration: 5s
+									
+									
+
+API CAN BE PROTECTED USING RATE-LIMITING:
+
+1. Actuator, AOP & Resilien4j dependencies are important.
+2. @RateLimiter(name="dummyRateLimiterName", fallbackMethod="dummyFallbackMethodName") can be used over an endpoint.
+3. Rate limiting can be configured with ==>
+					
+					ratelimiter:
+						instances:
+							dummyRateLimiterName:
+								limit-refresh-period: 4s
+								limit-for-period: 2 (allows 2 requests for every 4s)
+								timeout-duration: 0s
+								

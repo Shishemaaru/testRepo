@@ -1,0 +1,119 @@
+**************** KAFKA COMMANDS ****************
+													
+
+** TOPIC RELATED **
+
+1. To create a topic:
+	bin/kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic myTopic --partitions 1 --replication-factor 1
+	
+2. To list all topics:
+	bin/kafka/ kafka-topics.sh --bootstrap-server localhost:9092 --list
+	
+3. To describe details of a topic:
+	bin/kafka/ kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic myTopic
+
+	
+-----------------------------------------------------------------------------------------------------
+
+
+** PRODUCER / CONSUMER RELATED **
+
+1. To create a producer for a topic:
+	bin/kafka kafka-console-producer.sh --bootstrap-server localhost:9092 --topic myTopic
+	
+2. To consume messages from beginning from a topic:
+	bin/kafka kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic myTopic --from-beginning
+	
+3. To list all consumer groups:
+	bin/kafka kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list
+	
+4. To describe a consumer group:
+	bin/kafka kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group <consumer-group-name>
+
+5. To create a consumer in a consumer group, for a topic:
+	bin/kafka kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic myTopic --group myGroup
+
+-----------------------------------------------------------------------------------------------------
+
+** TOPIC / PARTITION RELATED **
+
+1. Topic consists of Partitions.
+2. Partitions consist of records which have sequential IDs.
+3. Records in Partitions have offsets defined by sequential IDs.
+4. Offset types are:
+		a. Log-end Offset :: Offset of the last message written to a partition.
+		b. Current Offset :: Offset of the last current message that Kafka cluster has sent to a Consumer Group for processing.
+		c. Committed Offset :: Offset of the message that has been consumed and successfully committed by the Consumer Group. Can never be greater than Current Offset.
+5.  
+
+	
+NOTE : 1) Replication factor can not be more than available brokers, else CLI will throw exception.
+	   2) Partitions can only be increased and not decreased.
+	   3) Partitions/Replicas can be re-assigned to different broker.
+	   4) Max poll records are the max records a consumer requests from Kafka cluster.
+	   
+
+-----------------------------------------------------------------------------------------------------
+
+
+**************** PRODUCER CONFIGS (kafka/config/producer.properties) ****************
+
+																				
+To apply properties to producer:
+
+bin/kafka-console-producer.sh --bootstrap-server localhost:9092 --topic myTopic --producer.config config/producer.properties
+
+
+
+** ACKNOWLEDGEMENT **
+
+There are 3 types of Acknowledgements when Producer sends data to topic/Partitions:
+
+	a. acks = 0, Producer does not wait for acknowledgement from Broker and keeps sending messages.
+	b. acks = 1, Producer waits for acknowledgment from the Partition Leader which in turn does not wait for acknowledgement from Replicas. 
+	c. acks = -1, Producer waits for acknowledgement from Partition Leader which in turn waits for acknowledgement from all Replicas.
+	
+	
+** PROPERTIES **
+	
+1. A Producer can produce messages to topic/partition in Batches.
+2. "buffer.memory" property is used to allocate a Producer some space in RAM.
+3. "batch.size" property is used to define the size of a batch of messages to be sent to topic/partition.
+4. "linger.ms" property defines the max waiting time for the producer to wait for messages to be batched. Default value is 0.
+5. "batch.size" or "linger.ms", either property can be used by Producer to create a batch, if size is full or waiting period defined by linger.ms elapses, the producer send the created batch.
+
+
+	   
+
+-----------------------------------------------------------------------------------------------------
+
+
+**************** CONSUMER CONFIGS (kafka/config/consumer.properties) ****************
+				
+** PROPERTIES **												
+																
+1. "client.id" is a string name used for debugging.
+2. "key.deserializer" is a deserializer class for keys.
+3. "value.deserializer" is a deserializer for values.
+4. "group.id" is a property that identifies the consumer group that a consumer belongs to.
+5. "fetch.min.bytes" is the min amount of data that a server should return for a fetch request. If insufficient data is there, request waits to accumulate more data.
+6. "heartbeat.interval.ms" ensures that the consumer's session is alive and also helps in facilitating consumer rebalancing if consumers join or leave the group. should not be more than below property.
+7. "session.timeout.ms" is the time which defines the duration between heartbeats and deems a session expired. e.g. if no heartbeat is sent for 10s (session timeout), the consumer is removed from the group and rebalance is initiated.
+8. "max.partiton.fetch.bytes"
+9. "fetch.max.bytes"
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+Q.) How to know the number and what brokers are registered in the Kafka Cluster?
+A.) echo dump | nc localhost 2181 | grep brokers (whitelist property might need to be enabled for 4 letter word commands like 'dump')
+
+
+Q.) What are ISR's?
+A.) ISR is In Sync Replicas, shows which all Replicas are In Sync.
+
+Q.) What is Kafka Controller Node?
+A.) In a Kafka Cluster, only one broker serves as the controller node and is responsible for managing the state of partitions and replicas or administrative tasks like reassigning partitions.
